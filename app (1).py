@@ -1,66 +1,107 @@
-import gradio as gr
+import streamlit as st
+import numpy as np
+import matplotlib.pyplot as plt
 
-# ------------------------------
-# Pump Power Calculation Function
-# ------------------------------
-def calculate_pump_power(flow_rate, head, density, efficiency):
-    # Input validation
-    if efficiency <= 0 or efficiency > 1:
-        return "Error: Efficiency must be between 0 and 1.", ""
-    if flow_rate < 0 or head < 0 or density <= 0:
-        return "Error: Flow rate, head, and density must be positive values.", ""
+# --------------------------------------------------
+# Page configuration
+# --------------------------------------------------
+st.set_page_config(
+    page_title="Pump Power Calculator",
+    layout="centered"
+)
 
-    g = 9.81  # gravitational acceleration (m/s^2)
+# --------------------------------------------------
+# Title & description
+# --------------------------------------------------
+st.title("🔧 Pump Power Calculator")
+st.markdown("### For Mechanical Engineering Students")
 
-    # Hydraulic power (Watts)
-    hydraulic_power = density * g * flow_rate * head  # W
+st.markdown("""
+This web app calculates the **required pump power** based on flow rate,
+pump head, and efficiency.
+""")
 
-    # Brake power (including efficiency)
-    brake_power = hydraulic_power / efficiency  # W
+# --------------------------------------------------
+# Sidebar inputs
+# --------------------------------------------------
+st.sidebar.header("Input Parameters")
 
-    # Convert to kW
-    hydraulic_kw = hydraulic_power / 1000
-    brake_kw = brake_power / 1000
+Q = st.sidebar.number_input(
+    "Flow Rate (m³/s)",
+    min_value=0.0,
+    value=0.05,
+    step=0.01
+)
 
-    return (f"{hydraulic_kw:.3f} kW", f"{brake_kw:.3f} kW")
+H = st.sidebar.number_input(
+    "Pump Head (m)",
+    min_value=0.0,
+    value=20.0,
+    step=1.0
+)
 
+eta = st.sidebar.slider(
+    "Pump Efficiency (η)",
+    min_value=0.1,
+    max_value=1.0,
+    value=0.7
+)
 
-# ------------------------------
-# Gradio Interface
-# ------------------------------
-with gr.Blocks(title="Pump Power Calculator") as demo:
-    gr.Markdown(
-        """
-        # 💧 Pump Power Calculator
-        Calculate **Hydraulic Power** and **Brake Power** of a pump using input parameters.
-        
-        **Formulas Used:**
-        - Hydraulic Power: ρ × 9.81 × Q × H  
-        - Brake Power: Hydraulic Power / η  
-        
-        Enter the values below:
-        """
-    )
+# --------------------------------------------------
+# Pump power calculation
+# --------------------------------------------------
+def pump_power(flow_rate, head, efficiency):
+    rho = 1000      # kg/m³
+    g = 9.81        # m/s²
+    power_kw = (rho * g * flow_rate * head) / efficiency / 1000
+    return power_kw
 
-    with gr.Row():
-        flow_rate = gr.Number(label="Flow Rate Q (m³/s)", value=0.01)
-        head = gr.Number(label="Head H (m)", value=20)
+# --------------------------------------------------
+# Button action
+# --------------------------------------------------
+if st.sidebar.button("Calculate Pump Power"):
+    power = pump_power(Q, H, eta)
 
-    with gr.Row():
-        density = gr.Number(label="Fluid Density ρ (kg/m³)", value=1000)
-        efficiency = gr.Number(label="Pump Efficiency η (0–1)", value=0.70)
+    st.success(f"✅ Required Pump Power: **{power:.2f} kW**")
 
-    calc_button = gr.Button("Calculate Power")
+    # --------------------------------------------------
+    # Plot: Pump Power vs Flow Rate
+    # --------------------------------------------------
+    flow_range = np.linspace(0.01, max(Q * 1.5, 0.02), 20)
+    power_curve = [
+        pump_power(q, H, eta) for q in flow_range
+    ]
 
-    with gr.Row():
-        hydraulic_output = gr.Textbox(label="Hydraulic Power (kW)", interactive=False)
-        brake_output = gr.Textbox(label="Brake Power (kW)", interactive=False)
+    fig, ax = plt.subplots()
+    ax.plot(flow_range, power_curve)
+    ax.set_xlabel("Flow Rate (m³/s)")
+    ax.set_ylabel("Pump Power (kW)")
+    ax.set_title("Pump Power vs Flow Rate")
+    ax.grid(True)
 
-    calc_button.click(
-        calculate_pump_power,
-        inputs=[flow_rate, head, density, efficiency],
-        outputs=[hydraulic_output, brake_output]
-    )
+    st.pyplot(fig)
 
-# Run the app
-demo.launch()
+# --------------------------------------------------
+# Theory section
+# --------------------------------------------------
+st.markdown("---")
+st.markdown("""
+### 📘 Pump Power Formula
+
+\\[
+P = \\frac{\\rho g Q H}{\\eta}
+\\]
+
+**Where:**
+- ρ = 1000 kg/m³ (water density)
+- g = 9.81 m/s²
+- Q = Flow rate (m³/s)
+- H = Pump head (m)
+- η = Pump efficiency
+
+### ⚠ Assumptions
+- Incompressible fluid (water)
+- Steady flow
+- Constant efficiency
+""")
+
